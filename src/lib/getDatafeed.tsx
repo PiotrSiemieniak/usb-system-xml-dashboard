@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Client } from "basic-ftp";
 import { XMLBuilder } from "fast-xml-parser";
 import { Writable } from "stream";

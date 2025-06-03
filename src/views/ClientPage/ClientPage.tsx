@@ -33,10 +33,12 @@ export default function ClientPage({
           <CardContent className="space-y-6">
             <div className="h-px bg-muted" />
             <DownloadButton onClick={() => setIsClicked(true)} xml={xml} />
-            <div className="bg-slate-50 p-6 rounded border text-green-950">
-              {isClicked &&
-                "Rozpoczęto pobieranie datafeed.xml. Sprawdź folder z pobranymi plikami."}
-            </div>
+            {isClicked && (
+              <div className="bg-slate-50 p-6 rounded border text-green-950">
+                Rozpoczęto pobieranie datafeed.xml. Sprawdź folder z pobranymi
+                plikami.
+              </div>
+            )}
           </CardContent>
         </Card>
       </main>

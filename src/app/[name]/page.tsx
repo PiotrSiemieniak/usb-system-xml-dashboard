@@ -11,12 +11,9 @@ export default async function Page({
   const decodedName = decodeURIComponent(name);
   const response = await getDatafeed(decodedName);
 
-  // console.log("resp", response);
-
   if (!response) notFound();
-
-  // Funkcja do pobierania pliku XML po stronie klienta
 
   return <ClientPage email={decodedName} xml={response} />;
 }
-// ...existing code...
+
+export const revalidate = 86400; // 24 godziny w sekundach

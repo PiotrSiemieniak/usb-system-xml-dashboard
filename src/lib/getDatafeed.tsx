@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Client } from "basic-ftp";
-import { XMLBuilder } from "fast-xml-parser";
+import { XMLBuilder, XMLParser } from "fast-xml-parser";
 import { Writable } from "stream";
 import * as XLSX from "xlsx";
 import { getDiscount } from "./getDiscount";
@@ -20,6 +20,8 @@ const PRICE_COLUMNS = [
   "EUR 1000",
 ];
 
+const stockConnectUrl = "https://stockconnect.pl/www/xml/stany.xml";
+
 // ========================
 // Funkcje pomocnicze
 // ========================
@@ -29,7 +31,7 @@ function normalizeKeys(obj: any): any {
   if (typeof obj === "object" && obj !== null) {
     return Object.fromEntries(
       Object.entries(obj).map(([key, value]) => [
-        key.replace(/\s+/g, "_"),
+        key.trim().replace(/\s+/g, "_"),
         normalizeKeys(value),
       ])
     );
@@ -54,13 +56,13 @@ function parsePrice(raw: any): number | null {
 }
 
 function applyDiscountToPrices(row: any, discount: number): void {
-  for (const col of PRICE_COLUMNS) {
-    if (row[col] !== undefined) {
-      const original = row[col];
-      const price = parsePrice(original);
+  for (const [key, value] of Object.entries(row)) {
+    const normalizedKey = key.trim(); // usuwa spacje z końca/ początku
+    if (PRICE_COLUMNS.includes(normalizedKey)) {
+      const price = parsePrice(value);
 
       if (price === null) {
-        row[col] = "";
+        row[key] = "";
         continue;
       }
 
@@ -68,13 +70,12 @@ function applyDiscountToPrices(row: any, discount: number): void {
       const formatted = discounted.toFixed(2).replace(".", ",");
 
       // Wykryj walutę i zastosuj odpowiedni format
-      if (typeof original === "string" && original.includes("zł")) {
-        row[col] = `${formatted} zł`;
-      } else if (typeof original === "string" && original.includes("€")) {
-        row[col] = `€ ${formatted}`;
+      if (typeof value === "string" && value.includes("zł")) {
+        row[key] = `${formatted} zł`;
+      } else if (typeof value === "string" && value.includes("€")) {
+        row[key] = `€ ${formatted}`;
       } else {
-        // Domyślnie zł jeśli brak informacji
-        row[col] = `${formatted} zł`;
+        row[key] = `${formatted} zł`;
       }
     }
   }
@@ -98,6 +99,42 @@ async function downloadAndParseXLSX(
   return XLSX.utils.sheet_to_json<any>(sheet);
 }
 
+// utils/fetchXmlAndGetStan.ts
+export async function fetchXmlFromUrl(url: string): Promise<string> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("Nie udało się pobrać XMLa");
+  return res.text();
+}
+
+export function getStanFromXml(
+  xml: string,
+  symbol: string,
+  i: number
+): number | null {
+  const parser = new XMLParser({ ignoreAttributes: false });
+  const parsed = parser.parse(xml);
+
+  const produkty = parsed?.Stany?.Lista?.Produkt;
+
+  if (!produkty) return null;
+
+  // Jeśli symbol jest stringiem, spróbuj sparsować do liczby
+  const targetSymbol =
+    typeof symbol === "string" ? parseInt(symbol, 10) : symbol;
+
+  // Gdy tylko jeden produkt
+  if (!Array.isArray(produkty)) {
+    const produkt = produkty;
+    return produkt.Symbol === targetSymbol ? parseInt(produkt.Stan, 10) : null;
+  }
+
+  // Gdy wiele produktów
+  const found = produkty.find(
+    (produkt: any) => produkt.Symbol === targetSymbol
+  );
+  return found ? parseInt(found.Stan, 10) : null;
+}
+
 // ========================
 // Główna funkcja
 // ========================
@@ -106,6 +143,8 @@ export async function getDatafeed(email: string): Promise<string | null> {
   const ftpClient = new Client();
 
   try {
+    const stockXml = await fetchXmlFromUrl(stockConnectUrl);
+
     const discountStr = await getDiscount(email); // np. "15"
     if (discountStr === null) return null;
     const discount = parseFloat(discountStr);
@@ -129,16 +168,23 @@ export async function getDatafeed(email: string): Promise<string | null> {
     const mergedProducts = nameData
       .map((item: any, i) => {
         const modelSymbol = item.model_symbol;
+        const symbol = item.symbol;
         const match = dataMap.get(modelSymbol);
+        const stan = getStanFromXml(stockXml, symbol, i);
         if (!match) return null;
 
-        if (i === 0) console.log(match);
-        const combined = { ...item, ...match };
+        const combined = {
+          ...item,
+          ...match,
+          stan: stan,
+        };
+        combined.name = item.name;
         applyDiscountToPrices(combined, discount);
         return normalizeKeys(combined);
       })
       .filter(Boolean);
 
+    console.log(mergedProducts[505].capacity);
     const builder = new XMLBuilder({ ignoreAttributes: false, format: true });
     const xml = builder.build({
       catalog: {

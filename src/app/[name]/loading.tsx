@@ -5,7 +5,7 @@ export default async function Page() {
         <h1 className="text-4xl font-bold text-center sm:text-left ml-6">
           ⏳ Generuję plik...
         </h1>
-        <div className="max-w-96 w-96 h-20 bg-gray-300 animate-pulse"></div>
+        <div className="max-w-96 w-[228px] border h-96 bg-gray-100 animate-pulse rounded-xl border py-6 shadow-sm" />
       </main>
     </div>
   );

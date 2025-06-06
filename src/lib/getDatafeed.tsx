@@ -106,11 +106,7 @@ export async function fetchXmlFromUrl(url: string): Promise<string> {
   return res.text();
 }
 
-export function getStanFromXml(
-  xml: string,
-  symbol: string,
-  i: number
-): number | null {
+export function getStanFromXml(xml: string, symbol: string): number | null {
   const parser = new XMLParser({ ignoreAttributes: false });
   const parsed = parser.parse(xml);
 
@@ -166,11 +162,11 @@ export async function getDatafeed(email: string): Promise<string | null> {
     }
 
     const mergedProducts = nameData
-      .map((item: any, i) => {
+      .map((item: any) => {
         const modelSymbol = item.model_symbol;
         const symbol = item.symbol;
         const match = dataMap.get(modelSymbol);
-        const stan = getStanFromXml(stockXml, symbol, i);
+        const stan = getStanFromXml(stockXml, symbol);
         if (!match) return null;
 
         const combined = {
@@ -184,7 +180,7 @@ export async function getDatafeed(email: string): Promise<string | null> {
       })
       .filter(Boolean);
 
-    console.log(mergedProducts[505].capacity);
+    console.log(mergedProducts[3]);
     const builder = new XMLBuilder({ ignoreAttributes: false, format: true });
     const xml = builder.build({
       catalog: {

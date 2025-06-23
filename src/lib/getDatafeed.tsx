@@ -169,18 +169,37 @@ export async function getDatafeed(email: string): Promise<string | null> {
         const stan = getStanFromXml(stockXml, symbol);
         if (!match) return null;
 
+        // Wyciągnij wszystkie pola z prefixem "ver_" i usuń prefix
+        const verFields = Object.entries(item)
+          .filter(([key]) => key.startsWith("ver_"))
+          .reduce((acc, [key, value]) => {
+            acc[key.replace(/^ver_/, "")] = value;
+            return acc;
+          }, {} as Record<string, any>);
+
+        // Usuń pola z prefixem "ver_" z item
+        const itemWithoutVer = Object.fromEntries(
+          Object.entries(item).filter(([key]) => !key.startsWith("ver_"))
+        );
+
         const combined = {
-          ...item,
+          ...itemWithoutVer,
           ...match,
+          ...verFields,
           stan: stan,
         };
-        combined.name = item.name;
+
+        // Ustaw name na ver_name jeśli istnieje i nie jest undefined/puste
+        if (verFields.name !== undefined && verFields.name !== "") {
+          combined.name = verFields.name;
+        }
+
         applyDiscountToPrices(combined, discount);
         return normalizeKeys(combined);
       })
       .filter(Boolean);
 
-    console.log(mergedProducts[3]);
+    console.log(mergedProducts[12]);
     const builder = new XMLBuilder({ ignoreAttributes: false, format: true });
     const xml = builder.build({
       catalog: {
